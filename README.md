@@ -2,7 +2,6 @@
   <img src="https://raw.githubusercontent.com/scinfu/SwiftSoup/master/swiftsoup.png" alt="SwiftSoup" title="SwiftSoup">
 </p>
 
-
 ![Platform OS X | iOS | tvOS | watchOS | Linux](https://img.shields.io/badge/platform-Linux%20%7C%20OS%20X%20%7C%20iOS%20%7C%20tvOS%20%7C%20watchOS-orange.svg)
 [![SPM compatible](https://img.shields.io/badge/SPM-compatible-4BC51D.svg?style=flat)](https://github.com/apple/swift-package-manager)
 ![🐧 linux: ready](https://img.shields.io/badge/%F0%9F%90%A7%20linux-ready-red.svg)
@@ -48,7 +47,7 @@ To install it, simply add the dependency to your Package.Swift file:
 ```swift
 ...
 dependencies: [
-    .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.5.3"),
+    .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),
 ],
 targets: [
     .target( name: "YourTarget", dependencies: ["SwiftSoup"]),
@@ -204,6 +203,46 @@ do {
     let unsafe: String = "<p><a href='http://example.com/' onclick='stealCookies()'>Link</a></p>"
     let safe: String = try SwiftSoup.clean(unsafe, Whitelist.basic())!
     // now: <p><a href="http://example.com/" rel="nofollow">Link</a></p>
+} catch Exception.Error(let type, let message) {
+    print(message)
+} catch {
+    print("error")
+}
+```
+
+If you supply a whole HTML document, with a `<head>` tag, the `clean(_: String, _: String, _: Whitelist)` method will just return the cleaned body HTML.
+You can clean both `<head>` and `<body>` by providing a `Whitelist` for each tags.
+
+```swift
+do {
+    let unsafe: String = """
+    <html>
+        <head>
+            <title>Hey</title>
+            <script>console.log('hi');</script>
+        </head>
+        <body>
+            <p>Hello, world!</p>
+        </body>
+    </html>
+    """
+
+    var headWhitelist: Whitelist = {
+        do {
+            let customWhitelist = Whitelist.none()
+            try customWhitelist
+                .addTags("meta", "style", "title")
+            return customWhitelist
+        } catch {
+            fatalError("Couldn't init head whitelist")
+        }
+    }()
+
+    let unsafeDocument: Document = try SwiftSoup.parse(unsafe)
+    let safe: String = try SwiftSoup.Cleaner(headWhitelist: headWhitelist, bodyWhitelist: .relaxed())
+                            .clean(unsafeDocument)
+                            .html()
+    // now: <html><head><title>Hey</title></head><body><p>Hello, world!</p></body></html>
 } catch Exception.Error(let type, let message) {
     print(message)
 } catch {
@@ -446,7 +485,7 @@ Select returns a list of `Elements` (as `Elements`), which provides a range of m
 * `:lt(n)`: find elements whose sibling index (i.e. its position in the DOM tree relative to its parent) is less than n; e.g. `td:lt(3)`
 * `:gt(n)`: find elements whose sibling index is greater than n; e.g. `div p:gt(2)`
 * `:eq(n)`: find elements whose sibling index is equal to n; e.g. `form input:eq(1)`
-* `:has(seletor)`: find elements that contain elements matching the selector; e.g. `div:has(p)`
+* `:has(selector)`: find elements that contain elements matching the selector; e.g. `div:has(p)`
 * `:not(selector)`: find elements that do not match the selector; e.g. `div:not(.logo)`
 * `:contains(text)`: find elements that contain the given text. The search is case-insensitive; e.g. `p:contains(swiftsoup)`
 * `:containsOwn(text)`: find elements that directly contain the given text

@@ -26,7 +26,7 @@ class CleanerTest: XCTestCase {
         //        XCTAssertEqual("<img> \n<img>", dropped)
 
         let preserved = try SwiftSoup.clean(html, Whitelist.basicWithImages().addProtocols("img", "src", "cid", "data"))
-        XCTAssertEqual("<img src=\"cid:12345\"> \n<img src=\"data:gzzt\">", preserved)
+        XCTAssertEqual("<img src=\"cid:12345\" /> \n<img src=\"data:gzzt\" />", preserved)
     }
 
     func testSimpleBehaviourTest()throws {
@@ -53,7 +53,7 @@ class CleanerTest: XCTestCase {
     func testBasicWithImagesTest()throws {
         let h = "<div><p><img src='http://example.com/' alt=Image></p><p><img src='ftp://ftp.example.com'></p></div>"
         let cleanHtml = try SwiftSoup.clean(h, Whitelist.basicWithImages())
-        XCTAssertEqual("<p><img src=\"http://example.com/\" alt=\"Image\"></p><p><img></p>", TextUtil.stripNewlines(cleanHtml!))
+        XCTAssertEqual("<p><img src=\"http://example.com/\" alt=\"Image\" /></p><p><img /></p>", TextUtil.stripNewlines(cleanHtml!))
     }
 
     func testRelaxed()throws {
@@ -113,7 +113,7 @@ class CleanerTest: XCTestCase {
     func testDropImageScript()throws {
         let h = "<IMG SRC=\"javascript:alert('XSS')\">"
         let cleanHtml = try SwiftSoup.clean(h, Whitelist.relaxed())
-        XCTAssertEqual("<img>", cleanHtml)
+        XCTAssertEqual("<img />", cleanHtml)
     }
 
     func testCleanJavascriptHref()throws {
@@ -153,7 +153,7 @@ class CleanerTest: XCTestCase {
     func testtestHandlesEmptyAttributes()throws {
         let h = "<img alt=\"\" src= unknown=''>"
         let cleanHtml = try SwiftSoup.clean(h, Whitelist.basicWithImages())
-        XCTAssertEqual("<img alt=\"\">", cleanHtml)
+        XCTAssertEqual("<img alt=\"\" />", cleanHtml)
     }
 
     func testIsValid()throws {
@@ -170,13 +170,13 @@ class CleanerTest: XCTestCase {
     func testResolvesRelativeLinks()throws {
         let html = "<a href='/foo'>Link</a><img src='/bar'>"
         let clean = try SwiftSoup.clean(html, "http://example.com/", Whitelist.basicWithImages())
-        XCTAssertEqual("<a href=\"http://example.com/foo\" rel=\"nofollow\">Link</a>\n<img src=\"http://example.com/bar\">", clean)
+        XCTAssertEqual("<a href=\"http://example.com/foo\" rel=\"nofollow\">Link</a>\n<img src=\"http://example.com/bar\" />", clean)
     }
 
     func testPreservesRelativeLinksIfConfigured()throws {
         let html = "<a href='/foo'>Link</a><img src='/bar'> <img src='javascript:alert()'>"
         let clean = try SwiftSoup.clean(html, "http://example.com/", Whitelist.basicWithImages().preserveRelativeLinks(true))
-        XCTAssertEqual("<a href=\"/foo\" rel=\"nofollow\">Link</a>\n<img src=\"/bar\"> \n<img>", clean)
+        XCTAssertEqual("<a href=\"/foo\" rel=\"nofollow\">Link</a>\n<img src=\"/bar\" /> \n<img />", clean)
     }
 
     func testDropsUnresolvableRelativeLinks()throws {
@@ -237,6 +237,24 @@ class CleanerTest: XCTestCase {
         let cleanDoc: Document? = try Cleaner(Whitelist.basic()).clean(dirtyDoc)
         XCTAssertFalse(cleanDoc == nil)
         XCTAssertEqual(0, cleanDoc?.body()?.childNodeSize())
+    }
+
+    func testCleanHeadAndBody() throws {
+        let dirty = "<html><head><title>Hello</title><style>body {}</style></head><body><p>Hey!</p></body></html>"
+        // let clean = "<html><head><title>Hello</title></head><body><p>Hey!</p></body></html>"
+
+        let headWhitelist = try Whitelist.none()
+            .addTags("title")
+
+        let dirtyDoc = try SwiftSoup.parse(dirty)
+        let cleanDoc = try Cleaner(headWhitelist: headWhitelist, bodyWhitelist: .relaxed()).clean(dirtyDoc)
+
+        let cleanHead = cleanDoc.head()
+        XCTAssertNotNil(cleanHead)
+        XCTAssertEqual(1, cleanHead?.childNodeSize())
+        let title = try cleanHead?.select("title").first()
+        XCTAssertNotNil(title)
+        XCTAssertEqual("title", title?.tagName())
     }
 
     func testCleansInternationalText()throws {
@@ -315,7 +333,9 @@ class CleanerTest: XCTestCase {
             ("testAddsTagOnAttributesIfNotSet", testAddsTagOnAttributesIfNotSet),
             ("testHandlesFramesets", testHandlesFramesets),
             ("testCleansInternationalText", testCleansInternationalText),
-            ("testScriptTagInWhiteList", testScriptTagInWhiteList)
+            ("testScriptTagInWhiteList", testScriptTagInWhiteList),
+            ("testCleanHeadAndBody", testCleanHeadAndBody)
+            
         ]
     }()
 
